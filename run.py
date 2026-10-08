@@ -8,7 +8,7 @@ import pandas as pd
 
 from data import load_prices, to_monthly, to_returns
 from universe import load_sp500_history, membership_table
-from strategies import momentum, equal_weight, reversal
+from strategies import momentum, equal_weight, reversal, trend
 from backtest import run_backtest, first_invested_date, turnover
 from metrics import summary
 
@@ -29,6 +29,7 @@ if __name__ == "__main__":
         "Momentum 6m":  lambda p: momentum.weights(p, members=members, lookback=6),
         "Equal weight": lambda p: equal_weight.weights(p, members=members),
         "Reversal 1m":  lambda p: reversal.weights(p, members=members),
+        "Trend 10m": lambda p: trend.weights(p, members = members)
     }
 
     # 4. Weights for each strategy

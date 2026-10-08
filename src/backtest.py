@@ -14,6 +14,7 @@ def first_invested_date(weights):
 def turnover(weights, returns):
     previous = weights.shift(1).fillna(0.0)
     grown = previous * (1 + returns.fillna(0.0))
-    total = grown.sum(axis=1)
-    drifted = grown.div(total.where(total != 0), axis=0).fillna(0.0)
+    cash = 1 - previous.sum(axis=1)
+    total = grown.sum(axis=1) + cash
+    drifted = grown.div(total, axis=0)
     return (weights - drifted).abs().sum(axis=1)
