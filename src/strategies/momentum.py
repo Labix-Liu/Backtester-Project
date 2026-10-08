@@ -9,6 +9,8 @@ def momentum_weights(signal, top_frac = 0.1):
     weights = weights.fillna(0.0)
     return weights
 
-def weights(monthly_prices, lookback = 12, top_frac = 0.1):
+def weights(monthly_prices, members=None, lookback=12, top_frac=0.1):
     signal = momentum_signal(monthly_prices, lookback)
+    if members is not None:
+        signal = signal.where(members)
     return momentum_weights(signal, top_frac)

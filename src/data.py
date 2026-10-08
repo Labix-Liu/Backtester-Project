@@ -4,29 +4,10 @@ from datetime import datetime
 import yfinance as yf
 import pandas as pd
 from pathlib import Path
+from universe import load_sp500_history, all_tickers
+import time   # at the top of the file
 
-# retrieves the current companies in S&P500 (as of 8/10/2026)
-# sampling from the current list introduces a bias: 
-# these are the companies that survived over the years
-def get_sp500_tickers(path="data/sp500_tickers.csv", refresh=False):
-    path = Path(path)
-    if path.exists() and not refresh:
-        return pd.read_csv(path)
-    
-    url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
-    tables = pd.read_html(url, storage_options={"User-Agent": "Mozilla/5.0"})
-    sp500 = tables[0]
-    sp500["Symbol"] = sp500["Symbol"].str.replace(".", "-", regex = False)
-    sp500.to_csv(path, index=False)
-    return sp500
-
-# samples 50 random companies for first test
-def sample_universe(sp500, n, seed):
-    universe = sp500.sample(n, random_state = seed, axis = 0)
-    universe.to_csv("data/universe.csv", index = True)
-    return universe
-
-def download_prices(tickers, start_date, end_date):
+def download_prices(tickers, start_date, end_date, path="data/prices.csv"):
     raw = yf.download(
         tickers=tickers,
         start=start_date,
@@ -36,7 +17,24 @@ def download_prices(tickers, start_date, end_date):
         progress=False
     )
     prices = raw["Close"] # no peeking
-    prices.to_csv("data/prices.csv")
+    prices.to_csv(path)
+    return prices
+
+def fill_missing(prices, start_date, end_date, batch_size=50, pause=5):
+    """Re-download tickers whose columns are entirely empty, in small batches."""
+    missing = list(prices.columns[prices.isna().all()])
+    print(f"Retrying {len(missing)} tickers")
+
+    for i in range(0, len(missing), batch_size):
+        batch = missing[i:i + batch_size]
+        raw = yf.download(batch, start=start_date, end=end_date,
+                          auto_adjust=True, progress=False)
+        prices.update(raw["Close"])
+        time.sleep(pause)
+
+    still_missing = prices.columns[prices.isna().all()]
+    print(f"Recovered {len(missing) - len(still_missing)}, "
+          f"still missing {len(still_missing)}")
     return prices
 
 def load_prices(path="data/prices.csv"):
@@ -49,13 +47,17 @@ def to_returns(prices):
     return prices.pct_change(fill_method=None)
 
 if __name__ == "__main__":
-    sp500 = get_sp500_tickers()
-    universe = sample_universe(sp500, 50, 37)
-    tickers = universe["Symbol"].to_list()
-
     start_date = datetime(year=2005, month=1, day=1)
     end_date = datetime(year=2026, month=1, day=1)
 
-    prices = download_prices(tickers, start_date, end_date)
-    monthly_prices = to_monthly(prices)
-    monthly_returns = to_returns(monthly_prices)
+    tickers = all_tickers(load_sp500_history())
+    #prices = download_prices(tickers, start_date, end_date, path="data/prices_sp500_hist.csv")
+    prices = load_prices("data/prices_sp500_hist.csv")
+
+    empty = prices.columns[prices.isna().all()]
+    print(f"Saved {prices.shape[1]} tickers, {prices.shape[0]} days")
+    print(f"{len(empty)} tickers have no price data")
+
+    prices = load_prices("data/prices_sp500_hist.csv")
+    prices = fill_missing(prices, start_date, end_date)
+    prices.to_csv("data/prices_sp500_hist.csv")
