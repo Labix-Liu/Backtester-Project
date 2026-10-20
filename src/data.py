@@ -3,7 +3,6 @@
 from datetime import datetime
 import yfinance as yf
 import pandas as pd
-from pathlib import Path
 from universe import load_sp500_history, all_tickers
 import time   # at the top of the file
 
